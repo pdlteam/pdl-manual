@@ -1,0 +1,280 @@
+\documentclass{report}
+
+\title{PDL Manual}
+\author{}
+\date{}
+
+\usepackage{titlesec}
+\usepackage{natbib}
+\usepackage{graphicx}
+\usepackage{listings}
+\lstset{
+    basicstyle=\ttfamily,
+    frame=single,
+    escapeinside=``
+}
+
+\begin{document}
+
+\titleformat{\chapter}[hang]{\centering\LARGE\bfseries}{Chapter~\thechapter}{1em}{}
+
+\maketitle
+
+\tableofcontents
+
+\thispagestyle{empty}
+
+\setcounter{page}{1}
+
+\chapter{Introduction}
+
+Problem Description Language (PDL) is a modeling language for specifying constraint optimization problems. When using PDL, users only need to list all constraints between the variables without indicating how to solve the problem -- the PDL runtime system will automatically design a feasible solving algorithm and generate the corresponding code.
+
+PDL supports many common-used operators and functions. PDL lets users describe models in a way that is close to a mathematical formulation of the problem using familiar notations.
+
+Compared with programming with traditional programming languages, programming with PDL has a lot of advantages:
+\begin{itemize}
+    \item Users can solve the problems without any programming abilities, only some basic mathematical knowledge is required;
+    \item PDL models are more readable than programs, which makes it easier to comprehense and debug;
+    \item Users can focus on modeling, and save plenty of time in thinking of how to solve the problem;
+    \item Bugs introduced by human errors can be avoided while using an automatic generation tool;
+    \item Users can apply advanced optimizations based on the generated programs.
+\end{itemize}
+
+\chapter{PDL Examples}
+
+This chapter demonstrates PDL models of two problems. \textbf{White space can be freely inserted between tokens to improve readability.} Detailed explanations of usage will be provided in Chapter 3.
+
+\section{Cuboid Problem}
+
+Given the volume $V$, find a cuboid with the smallest surface area such that (1) the volume is V and (2) the lengths of all edges are integers.
+
+\begin{lstlisting}
+#input
+	V of int in [1,10^4];
+
+#required
+	L of int in [1,?];
+	W of int in [1,?];
+	H of int in [1,?];
+	V = L * W * H;
+
+#objective
+	minimize (2 * (L * W + L * H + W * H));
+\end{lstlisting}
+
+\section{0/1 Knapsack Problem}
+
+There are $N$ items, each has value and weight. Select a set of items to put in the knapsack, such that the total weight is not greater than the capacity and the total value is maximum.
+
+\begin{lstlisting}
+#input
+	N of int in [1,100];
+	capacity of int in [1,1000];
+	profits of (int in [1,1000])[1~N];
+	weights of (int in [1,1000])[1~N];
+	
+#required
+	knapsack of (int in [1,N]){};
+	summation
+	    [weights[i] : forall i (i in knapsack)] 
+	    <= capacity;
+	    
+#objective
+	maximize summation
+	    [profits[i] : forall i (i in knapsack)];
+\end{lstlisting}
+
+\chapter{PDL Tutorial}
+
+\section{Basic Framework}
+
+A PDL model consists of three segments: \texttt{\#input}, \texttt{\#required}, and \texttt{\#objective}. Each statement should be ended with a semicolon (``\texttt{;}''). We will take 0/1 knapsack problem as an example to describe the basic framework of a PDL model in detail.
+
+\subsection{\texttt{\#input} Section}
+
+This section declares all input parameters and their types as well as value ranges.
+
+In the example, the \texttt{\#input} section lists four input parameters of this problem: two variables \texttt{N} and \texttt{capacity} of integer type, and two variables \texttt{profits} and \texttt{weights} of integer array type. Meanwhile, the value ranges as well as index ranges are also declared.
+
+\textbf{Note: These inputs will be read in the same order by the generated program, so please make sure that the declaring order is correct.}
+
+\subsection{\texttt{\#required} Section}
+
+This section contains several statements. Each statement can be:
+\begin{itemize}
+    \item a variable declaration, which is similar to the one in \texttt{\#input} section, or
+    \item a boolean expression indicating a mathematical relation between inputs and variables.
+\end{itemize}
+
+In the example, \texttt{\#required} section first define a variable \texttt{knapsack} of set type---the indexes of items we are going to pick. Then follows a constraint that should be satisfied---the total weight of the selected items should not exceeding \texttt{capacity}.
+
+\subsection{\texttt{\#objective} Section}
+
+This section declares zero or one objective function. If no objective function is defined, the resulting program will stop search after finding one solution; otherwise, it will search for the optimal solution that produces either the maximized or minimized value.
+
+In the example, the objective function is to maximize the total profits of the selected items.
+
+\section{Variable Declaration}
+
+In PDL, input parameters or variables are declared by:
+
+\begin{lstlisting}
+    <identifier> of <type-and-range>
+\end{lstlisting}
+
+\subsection{Identifier}
+
+An identifier of a user-defined item (input, variable, function ...) should be a sequence of letters (\texttt{a-z} or \texttt{A-Z}, case-sensitive), numbers (\texttt{0-9}), and underscores (\texttt{\_}). The first character should be a letter. Some reserved keywords cannot be used as identifiers, including:
+\begin{verbatim}
+    int, real, bool, char, function, of, in, true, false,
+    and, or, not, xor, mod, if, else, forall, exists, 
+    summation, product, count, min, max, minimize, maximize
+\end{verbatim}
+\textbf{Some reserved keywords in C/C++ cannot be used either}, such as \texttt{return}, \texttt{main}, etc.
+
+\subsection{Type and Range}
+
+PDL supports four primitive types and three composite types.
+
+Primitive types are: integer type \texttt{int}, real type \texttt{real}, boolean type \texttt{bool}, and character type \texttt{char}. To limit range of a primitive type \texttt{T} between \texttt{lb} and \texttt{ub}, use \texttt{T in [lb,ub]}. Specially, use \texttt{?} if a bound of the range is unspecified.
+
+Composite types are:
+\begin{itemize}
+    \item Array type: an array of \texttt{T} type variables is represented as \texttt{T[]}, for example, \texttt{int[]} is an array of integers, \texttt{bool[][]} is a two-dimensional array of booleans. To limit the range of index between \texttt{li} and \texttt{ui}, use \texttt{T[li$\scriptsize{\sim}$ui]}. Similarly, use \texttt{?} if a bound is unspecified.
+    \item Set type: a set of \texttt{T} type variables is represented as \texttt{T\{\}}.
+    \item Tuple type: a tuple can include variables of different types, which is represented as \texttt{(T1,T2,...)}.
+\end{itemize}
+
+\subsection{Examples of Variable Declaration}
+
+\begin{lstlisting}
+// an integer variable
+i of int
+// an integer variable with value range
+n of int in [1,10^5]
+// an integer array
+a of int[]
+// an integer array with index range
+b of int[1`$\scriptsize{\sim}$`2*n]
+// an integer array with both range and index ranges
+c of (int in [1,10^6])[1`$\scriptsize{\sim}$`100]
+// a multi-dimensional array with index ranges
+d of (int in [1,100])[0`$\scriptsize{\sim}$`?][][-5`$\scriptsize{\sim}$`5]
+// an integer set
+s of int{}
+// an integer set with value range
+t of (int in [1,n]){}
+// a tuple consists of elements of different types
+p of (int, bool[1`$\scriptsize{\sim}$`10], int in [1,?])
+// a set of tuples
+q of (int, bool){}
+\end{lstlisting}
+
+\section{Primitive Operator}
+
+PDL supports many common-used mathematical operators on primitive types,  listed from greatest to smallest priority: 
+\begin{enumerate}
+    \item parenthesis \texttt{()}
+    \item power \texttt{\^{}}
+    \item multiply \texttt{*}, divide \texttt{/}, modulus \texttt{mod}
+    \item add \texttt{+}, subtract \texttt{-}
+    \item type check \texttt{of}, range check \texttt{in}
+    \item \texttt{not}, \texttt{and}
+    \item \texttt{or}, \texttt{xor}
+    \item comparisons \texttt{=}, \texttt{!=}, \texttt{>}, \texttt{<}, \texttt{>=}, \texttt{<=}
+\end{enumerate}
+
+\section{Composite Operator}
+
+PDL also supports some built-in operator for composite types:
+\begin{itemize}
+    \item Element selections: \texttt{[]}, the priority of which is second only to \texttt{()}. For instance, \texttt{a[5]}, \texttt{a[i+1]}, where \texttt{a} is an array or tuple. Note that the index of elements in a tuple starts at 1.
+    \item Set operators: intersect \texttt{*}, union \texttt{+}, minus \texttt{-}. Each set operator has the same priority as the primitive operator sharing the same notation.
+    \item Set comparisons, similar to primitive comparisons.
+    \item Belong to: \texttt{in}, the priority of which equals to the comparisons'. An expression \texttt{e in C} returns a boolean value, indicating whether there exists an element \texttt{e} in the variable \texttt{C} of a composite type.
+    \item Aggregate operators: \texttt{summation}, \texttt{product}, \texttt{count}, \texttt{max}, \texttt{min}. These operators can be applied to an array or set. For instance, \texttt{summation a} calculates the sum of all elements in array \texttt{a}, \texttt{max s} obtains the maximum element in set \texttt{s}.
+\end{itemize}
+
+\section{Quantifier}
+
+PDL supports two quantifiers $\exists$ and $\forall$ in first-order logic, represented by \texttt{exists} and \texttt{forall}.
+
+\subsection{Existential Quantifier}
+
+An existential quantifier can be used as
+\begin{lstlisting}
+exists <v1, v2, ...> (<bool-exp>)
+\end{lstlisting}
+The expression returns a boolean value, indicating whether there exists an assignment to all variables in the list that satisfies the following boolean expression.
+
+Example: checking whether there exists an inversion in the array \texttt{a}.
+\begin{lstlisting}
+exists i,j ((i<j) and (a[i]>a[j]))
+\end{lstlisting}
+
+\subsection{Universal Quantifier}
+
+In PDL, a universal quantifier can be used for two different purposes.
+
+\paragraph{Generating an array}:
+\begin{lstlisting}
+[<exp> : forall <v1, v2, ...> (<bool-exp>)]
+\end{lstlisting}
+This statement enumerates each value combination of variables that satisfies the boolean expression, generates an element by the front expression, and puts it into an array.
+
+Example: select each element from array \texttt{a} whose index belongs to set \texttt{s}.
+\begin{lstlisting}
+[ a[i] : forall i (i in s) ]
+\end{lstlisting}
+
+\paragraph{Generating statements}:
+\begin{lstlisting}
+<bool-exp> : forall <v1, v2, ...> (<bool-exp>)
+\end{lstlisting}
+This statement enumerates each value combination of variables that satisfies the latter boolean expression, generates a sequence of constraints by the first boolean expression.
+
+Example: require the elements in array \texttt{a} are in increasing order.
+\begin{lstlisting}
+a[i] < a[i+1] : forall i ( i of int in [1,N-1] )
+\end{lstlisting}
+\textbf{Note: the boolean expression after \texttt{forall} can be omitted if there is no extra constraint on the variables in the list.}
+
+\section{Conditional Statement}
+
+\begin{lstlisting}
+if <bool-exp> <exp1> else <exp2>
+\end{lstlisting}
+\textbf{Note: \texttt{else} and the expression after can be omitted.}
+
+\section{Function Define and Call}
+
+In PDL, users can self-define a function to simplify the description, or achieve recursive calculations.
+
+Functions can be defined by:
+\begin{lstlisting}
+<identifier> of function (<v1-def, v2-def, ...>)
+    -> <type-and-range> = <exp>
+\end{lstlisting}
+where \texttt{identifier} is the function name, \texttt{(v1-def,v2-def,...)->type-and-range} defines the type of function arguments and the return value. The last expression defines how to calculate the return value.
+
+Functions can be called by:
+\begin{lstlisting}
+<identifier>(<v1, v2,...>)
+\end{lstlisting}
+
+Example: check whether an integer \texttt{x} is an odd number.
+
+Function define:
+\begin{lstlisting}
+isOdd of function (x of int) -> bool = (x mod 2 = 1)
+\end{lstlisting}
+
+Function call:
+\begin{lstlisting}
+isOdd(5)
+\end{lstlisting}
+
+%\bibliographystyle{plain}
+%\bibliography{references}
+\end{document}
